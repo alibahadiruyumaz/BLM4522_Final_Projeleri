@@ -9,21 +9,33 @@ BEGIN
 END
 GO
 
--- Sertifikayı oluşturuyoruz
-CREATE CERTIFICATE TDE_Olist_Cert 
-WITH SUBJECT = 'Olist Veritabani TDE Sertifikasi';
+-- Sertifikayı oluşturuyoruz (zaten varsa atla)
+IF NOT EXISTS (SELECT * FROM sys.certificates WHERE name = 'TDE_Olist_Cert')
+BEGIN
+    CREATE CERTIFICATE TDE_Olist_Cert 
+    WITH SUBJECT = 'Olist Veritabani TDE Sertifikasi';
+END
 GO
 
 -- 2. ADIM: Kendi veritabanımıza geçip şifrelemeyi başlatma
 USE DB_Performans;
 GO
 
--- Veritabanı Şifreleme Anahtarını (DEK) oluşturuyoruz. AES_256 askeri standarttır.
-CREATE DATABASE ENCRYPTION KEY
-WITH ALGORITHM = AES_256
-ENCRYPTION BY SERVER CERTIFICATE TDE_Olist_Cert;
+-- Veritabanı Şifreleme Anahtarını (DEK) oluşturuyoruz (zaten varsa atla)
+IF NOT EXISTS (SELECT * FROM sys.dm_database_encryption_keys WHERE database_id = DB_ID('DB_Performans'))
+BEGIN
+    CREATE DATABASE ENCRYPTION KEY
+    WITH ALGORITHM = AES_256
+    ENCRYPTION BY SERVER CERTIFICATE TDE_Olist_Cert;
+END
 GO
 
--- Veritabanında şifrelemeyi aktif ediyoruz
-ALTER DATABASE DB_Performans SET ENCRYPTION ON;
+-- Şifreleme zaten aktif değilse aktif et
+IF NOT EXISTS (
+    SELECT * FROM sys.dm_database_encryption_keys 
+    WHERE database_id = DB_ID('DB_Performans') AND encryption_state = 3
+)
+BEGIN
+    ALTER DATABASE DB_Performans SET ENCRYPTION ON;
+END
 GO

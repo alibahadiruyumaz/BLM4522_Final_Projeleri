@@ -1,35 +1,48 @@
 USE master;
 GO
 
--- 1. TAM YEDEK DÖNÜŞÜ (Veritabanı zaten Restoring modunda, REPLACE ile eziyoruz)
+
+
+-- 1. TÜM AKTİF BAĞLANTILARI ZORLA KOPAR (Exclusive access için zorunlu)
+ALTER DATABASE DB_Performans SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+GO
+
+-- 2. TAIL-LOG YEDEĞİ AL (felaket anı ile son log arasındaki boşluğu kapat)
+BACKUP LOG DB_Performans
+TO DISK = 'C:\SQL_Backups\DB_Performans_Tail.trn'
+WITH NORECOVERY, INIT, STATS = 10;
+GO
+
+-- 3. TAM YEDEK DÖNÜŞÜ
 RESTORE DATABASE DB_Performans 
 FROM DISK = 'C:\SQL_Backups\DB_Performans_Full.bak' 
 WITH NORECOVERY, REPLACE;
 GO
 
--- 2. FARK YEDEĞİ DÖNÜŞÜ
+-- 4. FARK YEDEĞİ DÖNÜŞÜ
 RESTORE DATABASE DB_Performans 
 FROM DISK = 'C:\SQL_Backups\DB_Performans_Diff.bak' 
 WITH NORECOVERY;
 GO
 
--- 3. EKSİK OLAN HALKA: ARA İŞLEM GÜNLÜĞÜ YEDEĞİ (İşte unuttuğumuz adım)
+-- 5. ARA İŞLEM GÜNLÜĞÜ YEDEĞİ
 RESTORE LOG DB_Performans 
 FROM DISK = 'C:\SQL_Backups\DB_Performans_Log.trn' 
 WITH NORECOVERY;
 GO
 
--- 4. ZAMANDA YOLCULUK (Kuyruk Logu ve STOPAT)
+-- 6. ZAMANDA GERİ DÖNÜŞ (Tail-Log + STOPAT)
+
 RESTORE LOG DB_Performans 
 FROM DISK = 'C:\SQL_Backups\DB_Performans_Tail.trn' 
-WITH RECOVERY, STOPAT = '2026-05-13 17:43:58.853';
+WITH RECOVERY, STOPAT = '2026-06-07 16:11:26.863';
 GO
 
--- 5. ERİŞİMİ AÇ
+-- 7. ERİŞİMİ TEKRAR AÇ
 ALTER DATABASE DB_Performans SET MULTI_USER;
 GO
 
--- 6. ZAFER KONTROLÜ
+-- 8. ZAFER KONTROLÜ
 USE DB_Performans;
 GO
 SELECT TOP 10 order_id, order_status 
